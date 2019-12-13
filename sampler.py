@@ -1,7 +1,7 @@
 import torch
 import torch.utils.data
 import torchvision
-
+import numpy as np
 
 class ImbalancedDatasetSampler(torch.utils.data.sampler.Sampler):
     """Samples elements randomly from a given list of indices for imbalanced dataset
@@ -11,12 +11,12 @@ class ImbalancedDatasetSampler(torch.utils.data.sampler.Sampler):
     """
 
     def __init__(self, dataset, indices=None, num_samples=None):
-                
+
         # if indices is not provided, 
         # all elements in the dataset will be considered
         self.indices = list(range(len(dataset))) \
             if indices is None else indices
-            
+
         # if num_samples is not provided, 
         # draw `len(indices)` samples in each iteration
         self.num_samples = len(self.indices) \
@@ -25,16 +25,23 @@ class ImbalancedDatasetSampler(torch.utils.data.sampler.Sampler):
         # distribution of classes in the dataset 
         label_to_count = {}
         for idx in self.indices:
-            label = self._get_label(dataset, idx)
+            label = self._get_label(dataset, idx).numpy()
+            label = label.astype(int)
+            label = np.array2string(label)
+            
             if label in label_to_count:
                 label_to_count[label] += 1
             else:
                 label_to_count[label] = 1
-                
+
+        print(label_to_count)
         # weight for each sample
-        weights = [1.0 / label_to_count[self._get_label(dataset, idx)]
+        weights = [1.0 / label_to_count[np.array2string(self._get_label(dataset, idx).numpy().astype(int))]
                    for idx in self.indices]
+
         self.weights = torch.DoubleTensor(weights)
+        print(self.weights)
+        print('AAA:',np.unique(self.weights,return_counts=True))
 
     def _get_label(self, dataset, idx):
         dataset_type = type(dataset)
@@ -43,7 +50,7 @@ class ImbalancedDatasetSampler(torch.utils.data.sampler.Sampler):
         elif dataset_type is torchvision.datasets.ImageFolder:
             return dataset.imgs[idx][1]
         else:
-            raise NotImplementedError
+            return dataset.target[idx]
                 
     def __iter__(self):
         return (self.indices[i] for i in torch.multinomial(
@@ -51,4 +58,3 @@ class ImbalancedDatasetSampler(torch.utils.data.sampler.Sampler):
 
     def __len__(self):
         return self.num_samples
-        
